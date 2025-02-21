@@ -1,74 +1,51 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { View, FlatList, RefreshControl } from "react-native";
+import TaskItem from "@/components/TaskItem";
+import { getTasksFromStorage, saveTasksToStorage } from "@/hooks/storage";
+import { fetchTasksFromAPI } from "@/constants/api";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+// Define the type for a task
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  dueDate: string;
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+// Define the type for the dynamic route
+type TaskRoute = `/task/${string}`;
+
+export default function HomeScreen() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const router:any = useRouter();
+
+  useEffect(() => {
+    loadTasks();
+  }, []);
+
+  const loadTasks = async () => {
+    try {
+      const apiTasks: Task[] = await fetchTasksFromAPI();
+      setTasks(apiTasks);
+      await saveTasksToStorage(apiTasks);
+    } catch (error) {
+      const cachedTasks: Task[] = await getTasksFromStorage();
+      setTasks(cachedTasks);
+    }
+  };
+
+  return (
+    <View>
+      <FlatList
+        data={tasks}
+        keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadTasks} />}
+        renderItem={({ item }) => (
+          <TaskItem task={item} onPress={() => router.push(`/task/${item.id}` as TaskRoute)} />
+        )}
+      />
+    </View>
+  );
+}
